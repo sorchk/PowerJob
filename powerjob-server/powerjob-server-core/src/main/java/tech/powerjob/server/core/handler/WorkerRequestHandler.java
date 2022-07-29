@@ -7,6 +7,7 @@ import tech.powerjob.common.RemoteConstant;
 import tech.powerjob.common.request.*;
 import tech.powerjob.server.core.handler.impl.WorkerRequestAkkaHandler;
 import tech.powerjob.server.core.handler.impl.WorkerRequestHttpHandler;
+import tech.powerjob.server.core.handler.webhook.TaskFinishWebHook;
 import tech.powerjob.server.core.instance.InstanceLogService;
 import tech.powerjob.server.core.instance.InstanceManager;
 import tech.powerjob.server.core.workflow.WorkflowInstanceManager;
@@ -61,6 +62,9 @@ public class WorkerRequestHandler {
     @Resource
     private WorkerClusterQueryService workerClusterQueryService;
 
+    @Resource
+    private TaskFinishWebHook webHook;
+
     private static WorkerRequestHandler workerRequestHandler;
 
     @PostConstruct
@@ -96,6 +100,9 @@ public class WorkerRequestHandler {
 
         // 结束状态（成功/失败）需要回复消息
         if (InstanceStatus.FINISHED_STATUS.contains(req.getInstanceStatus())) {
+            // 任务执行完成后回调套通知
+            webHook.notify(req);
+
             return Optional.of(AskResponse.succeed(null));
         }
         return Optional.empty();
