@@ -79,9 +79,9 @@ public class PowerJobAutoConfiguration {
         config.setMaxAppendedWfContextLength(worker.getMaxAppendedWfContextLength());
 
         config.setTag(worker.getTag());
-
-        config.setFeatures(Arrays.asList(worker.getFeatures().split(",")));
-
+        if(worker.getFeatures()!=null){
+            config.setFeatures(Arrays.asList(worker.getFeatures().split(",")));
+        }
         config.setMaxHeavyweightTaskNum(worker.getMaxHeavyweightTaskNum());
 
         config.setMaxLightweightTaskNum(worker.getMaxLightweightTaskNum());
