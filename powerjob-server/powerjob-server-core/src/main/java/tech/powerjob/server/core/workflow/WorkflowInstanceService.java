@@ -4,6 +4,12 @@ import com.alibaba.fastjson.JSON;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.domain.Sort;
+
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import tech.powerjob.common.SystemInstanceResult;
 import tech.powerjob.common.enums.InstanceStatus;
@@ -11,6 +17,8 @@ import tech.powerjob.common.enums.WorkflowInstanceStatus;
 import tech.powerjob.common.enums.WorkflowNodeType;
 import tech.powerjob.common.exception.PowerJobException;
 import tech.powerjob.common.model.PEWorkflowDAG;
+import tech.powerjob.common.request.query.WorkflowInstanceInfoQuery;
+import tech.powerjob.common.response.PageResult;
 import tech.powerjob.common.response.WorkflowInstanceInfoDTO;
 import tech.powerjob.common.enums.SwitchableStatus;
 import tech.powerjob.server.common.utils.SpringUtils;
@@ -24,8 +32,10 @@ import tech.powerjob.server.persistence.remote.repository.WorkflowInstanceInfoRe
 import tech.powerjob.server.remote.server.redirector.DesignateServer;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 工作流实例服务
@@ -84,8 +94,10 @@ public class WorkflowInstanceService {
         // 遍历所有节点，终止正在运行的
         dag.getNodes().forEach(node -> {
             try {
-                if (node.getInstanceId() != null && InstanceStatus.GENERALIZED_RUNNING_STATUS.contains(node.getStatus())) {
-                    log.debug("[WfInstance-{}] instance({}) is running, try to stop it now.", wfInstanceId, node.getInstanceId());
+                if (node.getInstanceId() != null
+                        && InstanceStatus.GENERALIZED_RUNNING_STATUS.contains(node.getStatus())) {
+                    log.debug("[WfInstance-{}] instance({}) is running, try to stop it now.", wfInstanceId,
+                            node.getInstanceId());
                     node.setStatus(InstanceStatus.STOPPED.getV());
                     node.setResult(SystemInstanceResult.STOPPED_BY_USER);
                     // 特殊处理嵌套工作流节点
@@ -158,7 +170,6 @@ public class WorkflowInstanceService {
         workflowInstanceManager.start(workflowInfo.get(), wfInstanceId);
     }
 
-
     public WorkflowInstanceInfoDTO fetchWorkflowInstanceInfo(Long wfInstanceId, Long appId) {
         WorkflowInstanceInfoDO wfInstance = fetchWfInstance(wfInstanceId, appId);
         WorkflowInstanceInfoDTO dto = new WorkflowInstanceInfoDTO();
@@ -167,11 +178,42 @@ public class WorkflowInstanceService {
     }
 
     public WorkflowInstanceInfoDO fetchWfInstance(Long wfInstanceId, Long appId) {
-        WorkflowInstanceInfoDO wfInstance = wfInstanceInfoRepository.findByWfInstanceId(wfInstanceId).orElseThrow(() -> new IllegalArgumentException("can't find workflow instance by wfInstanceId: " + wfInstanceId));
+        WorkflowInstanceInfoDO wfInstance = wfInstanceInfoRepository.findByWfInstanceId(wfInstanceId).orElseThrow(
+                () -> new IllegalArgumentException("can't find workflow instance by wfInstanceId: " + wfInstanceId));
         if (!Objects.equals(appId, wfInstance.getAppId())) {
             throw new PowerJobException("Permission Denied!");
         }
         return wfInstance;
+    }
+
+    public PageResult<WorkflowInstanceInfoDTO> queryPageWorkflowInstanceInfo(WorkflowInstanceInfoQuery query) {
+        Sort sort = Sort.by(Sort.Direction.DESC, "gmtModified");
+        PageRequest pageable = PageRequest.of(query.getIndex(), query.getPageSize(), sort);
+        WorkflowInstanceInfoDO queryEntity = new WorkflowInstanceInfoDO();
+        BeanUtils.copyProperties(query, queryEntity);
+        if (query.getWfInstanceId()!=null&&query.getWfInstanceId()!=0) {
+            queryEntity.setWfInstanceId(query.getWfInstanceId());
+        }
+        if (query.getWorkflowId()!=null&&query.getWorkflowId()!=0) {
+            queryEntity.setWorkflowId(query.getWorkflowId());
+        }
+        if (!StringUtils.isEmpty(query.getStatus())) {
+            queryEntity.setStatus(InstanceStatus.valueOf(query.getStatus()).getV());
+        }
+        Page<WorkflowInstanceInfoDO> pageResult = wfInstanceInfoRepository.findAll(Example.of(queryEntity), pageable);
+        return convertPage(pageResult);
+    }
+
+    private PageResult<WorkflowInstanceInfoDTO> convertPage(Page<WorkflowInstanceInfoDO> page) {
+        List<WorkflowInstanceInfoDTO> content = page.getContent().stream()
+                .map(x -> directConvert(x)).collect(Collectors.toList());
+        PageResult<WorkflowInstanceInfoDTO> pageResult = new PageResult<>();
+        pageResult.setIndex(page.getNumber());
+        pageResult.setPageSize(page.getSize());
+        pageResult.setTotalPages(page.getTotalPages());
+        pageResult.setTotalItems(page.getTotalElements());
+        pageResult.setData(content);
+        return pageResult;
     }
 
     /**
@@ -225,6 +267,12 @@ public class WorkflowInstanceService {
         // 其他情况均拒绝处理
         throw new PowerJobException("you can only mark the node which is failed and not allow to skip!");
 
+    }
+
+    private static WorkflowInstanceInfoDTO directConvert(WorkflowInstanceInfoDO instanceInfoDO) {
+        WorkflowInstanceInfoDTO workflowInstanceInfoDTO = new WorkflowInstanceInfoDTO();
+        BeanUtils.copyProperties(instanceInfoDO, workflowInstanceInfoDTO);
+        return workflowInstanceInfoDTO;
     }
 
 }

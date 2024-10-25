@@ -14,8 +14,11 @@ import tech.powerjob.common.exception.PowerJobException;
 import tech.powerjob.common.request.http.SaveJobInfoRequest;
 import tech.powerjob.common.request.http.SaveWorkflowNodeRequest;
 import tech.powerjob.common.request.http.SaveWorkflowRequest;
+import tech.powerjob.common.request.query.InstanceInfoQuery;
 import tech.powerjob.common.request.query.JobInfoQuery;
+import tech.powerjob.common.request.query.WorkflowInstanceInfoQuery;
 import tech.powerjob.common.response.*;
+import tech.powerjob.server.core.instance.InstanceLogService;
 import tech.powerjob.server.core.instance.InstanceService;
 import tech.powerjob.server.core.service.AppInfoService;
 import tech.powerjob.server.core.service.CacheService;
@@ -23,10 +26,12 @@ import tech.powerjob.server.core.service.JobService;
 import tech.powerjob.server.core.workflow.WorkflowInstanceService;
 import tech.powerjob.server.core.workflow.WorkflowService;
 import tech.powerjob.server.openapi.security.OpenApiSecurityService;
+import tech.powerjob.server.persistence.StringPage;
 import tech.powerjob.server.persistence.remote.model.WorkflowInfoDO;
 import tech.powerjob.server.persistence.remote.model.WorkflowNodeInfoDO;
 import tech.powerjob.server.web.response.WorkflowInfoVO;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -53,8 +58,9 @@ public class OpenAPIController {
 
     private final OpenApiSecurityService openApiSecurityService;
 
-    private final CacheService cacheService;
+    private final InstanceLogService instanceLogService;
 
+    private final CacheService cacheService; 
 
     @PostMapping(OpenAPIConstant.ASSERT)
     public ResultDTO<Long> assertAppName(String appName, @RequestParam(required = false) String password) {
@@ -186,6 +192,22 @@ public class OpenAPIController {
     public ResultDTO<List<InstanceInfoDTO>> queryInstance(@RequestBody PowerQuery powerQuery) {
         return ResultDTO.success(instanceService.queryInstanceInfo(powerQuery));
     }
+    @PostMapping(OpenAPIConstant.QUERY_INSTANCE_INFO)
+    public ResultDTO<PageResult<InstanceInfoDTO>> queryInstanceInfo(@RequestBody InstanceInfoQuery powerQuery) {
+        return ResultDTO.success(instanceService.queryPageInstanceInfo(powerQuery));
+    }
+    @PostMapping(OpenAPIConstant.QUERY_INSTANCE_LOG)
+    public ResultDTO<PageResult<String>> queryInstanceLog(Long appId,Long instanceId,Long index) {
+        StringPage logPage = instanceLogService.fetchInstanceLog(appId, instanceId, index);
+        PageResult<String> result = new PageResult<>();
+        List<String> logList = new ArrayList<>();
+        logList.add(logPage.getData());
+        result.setData(logList);
+        result.setTotalPages((int)logPage.getTotalPages());
+        result.setTotalItems((int)logPage.getTotalPages());
+        result.setPageSize(1);
+        return ResultDTO.success(result);
+    }
 
     /* ************* Workflow 区 ************* */
 
@@ -257,6 +279,10 @@ public class OpenAPIController {
     @PostMapping(OpenAPIConstant.FETCH_WORKFLOW_INSTANCE_INFO)
     public ResultDTO<WorkflowInstanceInfoDTO> fetchWorkflowInstanceInfo(Long wfInstanceId, Long appId) {
         return ResultDTO.success(workflowInstanceService.fetchWorkflowInstanceInfo(wfInstanceId, appId));
+    }
+    @PostMapping(OpenAPIConstant.QUERY_WORKFLOW_INSTANCE_INFO)
+    public ResultDTO<PageResult<WorkflowInstanceInfoDTO>> queryPageWorkflowInstanceInfo(@RequestBody WorkflowInstanceInfoQuery powerQuery) {
+        return ResultDTO.success(workflowInstanceService.queryPageWorkflowInstanceInfo(powerQuery));
     }
 
     private void checkInstanceIdValid(Long instanceId, Long appId) {

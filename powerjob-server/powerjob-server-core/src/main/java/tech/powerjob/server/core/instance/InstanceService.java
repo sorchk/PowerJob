@@ -3,6 +3,12 @@ package tech.powerjob.server.core.instance;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.domain.Sort;
+
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import tech.powerjob.common.PowerQuery;
 import tech.powerjob.common.RemoteConstant;
@@ -12,8 +18,10 @@ import tech.powerjob.common.exception.PowerJobException;
 import tech.powerjob.common.model.InstanceDetail;
 import tech.powerjob.common.request.ServerQueryInstanceStatusReq;
 import tech.powerjob.common.request.ServerStopInstanceReq;
+import tech.powerjob.common.request.query.InstanceInfoQuery;
 import tech.powerjob.common.response.AskResponse;
 import tech.powerjob.common.response.InstanceInfoDTO;
+import tech.powerjob.common.response.PageResult;
 import tech.powerjob.remote.framework.base.URL;
 import tech.powerjob.server.common.constants.InstanceType;
 import tech.powerjob.server.common.module.WorkerInfo;
@@ -80,7 +88,8 @@ public class InstanceService {
      * @param expectTriggerTime 预期执行时间
      * @return 任务实例ID
      */
-    public InstanceInfoDO create(Long jobId, Long appId, String jobParams, String instanceParams, Long wfInstanceId, Long expectTriggerTime) {
+    public InstanceInfoDO create(Long jobId, Long appId, String jobParams, String instanceParams, Long wfInstanceId,
+            Long expectTriggerTime) {
 
         Long instanceId = idGenerateService.allocate();
         Date now = new Date();
@@ -111,9 +120,9 @@ public class InstanceService {
      * @param instanceId 任务实例ID
      */
     @DesignateServer
-    public void stopInstance(Long appId,Long instanceId) {
+    public void stopInstance(Long appId, Long instanceId) {
 
-        log.info("[Instance-{}] try to stop the instance instance in appId: {}", instanceId,appId);
+        log.info("[Instance-{}] try to stop the instance instance in appId: {}", instanceId, appId);
         try {
 
             InstanceInfoDO instanceInfo = fetchInstanceInfo(instanceId);
@@ -129,20 +138,25 @@ public class InstanceService {
             instanceInfo.setResult(SystemInstanceResult.STOPPED_BY_USER);
             instanceInfoRepository.saveAndFlush(instanceInfo);
 
-            instanceManager.processFinishedInstance(instanceId, instanceInfo.getWfInstanceId(), STOPPED, SystemInstanceResult.STOPPED_BY_USER);
+            instanceManager.processFinishedInstance(instanceId, instanceInfo.getWfInstanceId(), STOPPED,
+                    SystemInstanceResult.STOPPED_BY_USER);
 
             /*
-            不可靠通知停止 TaskTracker
-            假如没有成功关闭，之后 TaskTracker 会再次 reportStatus，按照流程，instanceLog 会被更新为 RUNNING，开发者可以再次手动关闭
+             * 不可靠通知停止 TaskTracker
+             * 假如没有成功关闭，之后 TaskTracker 会再次 reportStatus，按照流程，instanceLog 会被更新为
+             * RUNNING，开发者可以再次手动关闭
              */
-            Optional<WorkerInfo> workerInfoOpt = workerClusterQueryService.getWorkerInfoByAddress(instanceInfo.getAppId(), instanceInfo.getTaskTrackerAddress());
+            Optional<WorkerInfo> workerInfoOpt = workerClusterQueryService
+                    .getWorkerInfoByAddress(instanceInfo.getAppId(), instanceInfo.getTaskTrackerAddress());
             if (workerInfoOpt.isPresent()) {
                 ServerStopInstanceReq req = new ServerStopInstanceReq(instanceId);
                 WorkerInfo workerInfo = workerInfoOpt.get();
-                transportService.tell(workerInfo.getProtocol(), ServerURLFactory.stopInstance2Worker(workerInfo.getAddress()), req);
+                transportService.tell(workerInfo.getProtocol(),
+                        ServerURLFactory.stopInstance2Worker(workerInfo.getAddress()), req);
                 log.info("[Instance-{}] update instanceInfo and send 'stopInstance' request succeed.", instanceId);
             } else {
-                log.warn("[Instance-{}] update instanceInfo successfully but can't find TaskTracker to stop instance", instanceId);
+                log.warn("[Instance-{}] update instanceInfo successfully but can't find TaskTracker to stop instance",
+                        instanceId);
             }
 
         } catch (IllegalArgumentException ie) {
@@ -182,8 +196,9 @@ public class InstanceService {
 
         // 派发任务
         Long jobId = instanceInfo.getJobId();
-        JobInfoDO jobInfo = jobInfoRepository.findById(jobId).orElseThrow(() -> new PowerJobException("can't find job info by jobId: " + jobId));
-        dispatchService.dispatch(jobInfo, instanceId,Optional.of(instanceInfo),Optional.empty());
+        JobInfoDO jobInfo = jobInfoRepository.findById(jobId)
+                .orElseThrow(() -> new PowerJobException("can't find job info by jobId: " + jobId));
+        dispatchService.dispatch(jobInfo, instanceId, Optional.of(instanceInfo), Optional.empty());
     }
 
     /**
@@ -236,6 +251,31 @@ public class InstanceService {
                 .collect(Collectors.toList());
     }
 
+    public PageResult<InstanceInfoDTO> queryPageInstanceInfo(InstanceInfoQuery query) {
+        Sort sort = Sort.by(Sort.Direction.DESC, "gmtModified");
+        PageRequest pageable = PageRequest.of(query.getIndex(), query.getPageSize(), sort);
+        InstanceInfoDO queryEntity = new InstanceInfoDO();
+        BeanUtils.copyProperties(query, queryEntity);
+        queryEntity.setType(InstanceType.valueOf(query.getType()).getV());
+        if (!StringUtils.isEmpty(query.getStatus())) {
+            queryEntity.setStatus(InstanceStatus.valueOf(query.getStatus()).getV());
+        }
+        Page<InstanceInfoDO> pageResult = instanceInfoRepository.findAll(Example.of(queryEntity), pageable);
+        return convertPage(pageResult);
+    }
+
+    private PageResult<InstanceInfoDTO> convertPage(Page<InstanceInfoDO> page) {
+        List<InstanceInfoDTO> content = page.getContent().stream()
+                .map(x -> directConvert(x)).collect(Collectors.toList());
+        PageResult<InstanceInfoDTO> pageResult = new PageResult<>();
+        pageResult.setIndex(page.getNumber());
+        pageResult.setPageSize(page.getSize());
+        pageResult.setTotalPages(page.getTotalPages());
+        pageResult.setTotalItems(page.getTotalElements());
+        pageResult.setData(content);
+        return pageResult;
+    }
+
     /**
      * 获取任务实例的信息
      *
@@ -260,7 +300,7 @@ public class InstanceService {
     /**
      * 获取任务实例的详细运行详细
      *
-     * @param appId 用于远程 server 路由，勿删！
+     * @param appId      用于远程 server 路由，勿删！
      * @param instanceId 任务实例ID
      * @return 详细运行状态
      */
@@ -280,7 +320,8 @@ public class InstanceService {
             return detail;
         }
 
-        Optional<WorkerInfo> workerInfoOpt = workerClusterQueryService.getWorkerInfoByAddress(instanceInfoDO.getAppId(), instanceInfoDO.getTaskTrackerAddress());
+        Optional<WorkerInfo> workerInfoOpt = workerClusterQueryService.getWorkerInfoByAddress(instanceInfoDO.getAppId(),
+                instanceInfoDO.getTaskTrackerAddress());
         if (workerInfoOpt.isPresent()) {
             WorkerInfo workerInfo = workerInfoOpt.get();
             ServerQueryInstanceStatusReq req = new ServerQueryInstanceStatusReq(instanceId, customQuery);
@@ -294,11 +335,13 @@ public class InstanceService {
                     instanceDetail.setRunningTimes(instanceInfoDO.getRunningTimes());
                     instanceDetail.setInstanceParams(instanceInfoDO.getInstanceParams());
                     return instanceDetail;
-                }else {
-                    log.warn("[Instance-{}] ask InstanceStatus from TaskTracker failed, the message is {}.", instanceId, askResponse.getMessage());
+                } else {
+                    log.warn("[Instance-{}] ask InstanceStatus from TaskTracker failed, the message is {}.", instanceId,
+                            askResponse.getMessage());
                 }
             } catch (Exception e) {
-                log.warn("[Instance-{}] ask InstanceStatus from TaskTracker failed, exception is {}", instanceId, e.toString());
+                log.warn("[Instance-{}] ask InstanceStatus from TaskTracker failed, exception is {}", instanceId,
+                        e.toString());
             }
         }
 

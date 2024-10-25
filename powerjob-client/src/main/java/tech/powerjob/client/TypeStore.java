@@ -30,12 +30,15 @@ public class TypeStore {
 
     public static final TypeReference<ResultDTO<InstanceInfoDTO>> INSTANCE_RESULT_TYPE = new TypeReference<ResultDTO<InstanceInfoDTO>>() {};
 
-    public static final TypeReference<ResultDTO<List<InstanceInfoDTO>>> LIST_INSTANCE_RESULT_TYPE = new TypeReference<ResultDTO<List<InstanceInfoDTO>>>(){};
-
+    public static final TypeReference<ResultDTO<PageResult<InstanceInfoDTO>>> LIST_INSTANCE_RESULT_TYPE = new TypeReference<ResultDTO<PageResult<InstanceInfoDTO>>>(){};
+    
+    public static final TypeReference<ResultDTO<PageResult<String>>> INSTANCE_LOG_RESULT_TYPE = new TypeReference<ResultDTO<PageResult<String>>>(){};
+    
     public static final TypeReference<ResultDTO<WorkflowInfoDTO>> WF_RESULT_TYPE = new TypeReference<ResultDTO<WorkflowInfoDTO>>() {};
 
     public static final TypeReference<ResultDTO<WorkflowInstanceInfoDTO>> WF_INSTANCE_RESULT_TYPE = new TypeReference<ResultDTO<WorkflowInstanceInfoDTO>>() {};
-
+    public static final TypeReference<ResultDTO<PageResult<WorkflowInstanceInfoDTO>>> LIST_WF_INSTANCE_RESULT_TYPE = new TypeReference<ResultDTO<PageResult<WorkflowInstanceInfoDTO>>>(){};
+    
     public static final TypeReference<ResultDTO<List<WorkflowNodeInfoDTO>>> WF_NODE_LIST_RESULT_TYPE = new  TypeReference<ResultDTO<List<WorkflowNodeInfoDTO>>> () {};
 
 }

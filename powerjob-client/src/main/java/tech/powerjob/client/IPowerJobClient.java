@@ -3,7 +3,9 @@ package tech.powerjob.client;
 import tech.powerjob.common.request.http.SaveJobInfoRequest;
 import tech.powerjob.common.request.http.SaveWorkflowNodeRequest;
 import tech.powerjob.common.request.http.SaveWorkflowRequest;
+import tech.powerjob.common.request.query.InstanceInfoQuery;
 import tech.powerjob.common.request.query.JobInfoQuery;
+import tech.powerjob.common.request.query.WorkflowInstanceInfoQuery;
 import tech.powerjob.common.response.*;
 
 import java.util.List;
@@ -49,6 +51,18 @@ public interface IPowerJobClient {
     ResultDTO<Integer> fetchInstanceStatus(Long instanceId);
 
     ResultDTO<InstanceInfoDTO> fetchInstanceInfo(Long instanceId);
+    /**
+     * 查询实例列表
+     * @param query
+     * @return
+     */
+    ResultDTO<PageResult<InstanceInfoDTO>> queryPageInstanceInfo(InstanceInfoQuery query);
+    /**
+     * 查询实例日志，返回日志内容（字符串分页）
+     * @param instanceId
+     * @return
+     */
+    ResultDTO<PageResult<String>> queryPageInstanceLog(Long instanceId,Long index);
 
     /* ************* Workflow API list ************* */
     ResultDTO<Long> saveWorkflow(SaveWorkflowRequest request);
@@ -76,4 +90,11 @@ public interface IPowerJobClient {
     ResultDTO<Void> markWorkflowNodeAsSuccess(Long wfInstanceId, Long nodeId);
 
     ResultDTO<WorkflowInstanceInfoDTO> fetchWorkflowInstanceInfo(Long wfInstanceId);
+    /**
+     * 查询工作流实例列表
+     * @param query
+     * @return
+     */
+    ResultDTO<PageResult<WorkflowInstanceInfoDTO>> queryPageWorkflowInstanceInfo(WorkflowInstanceInfoQuery query);
+
 }

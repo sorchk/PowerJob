@@ -17,7 +17,9 @@ import tech.powerjob.common.exception.PowerJobException;
 import tech.powerjob.common.request.http.SaveJobInfoRequest;
 import tech.powerjob.common.request.http.SaveWorkflowNodeRequest;
 import tech.powerjob.common.request.http.SaveWorkflowRequest;
+import tech.powerjob.common.request.query.InstanceInfoQuery;
 import tech.powerjob.common.request.query.JobInfoQuery;
+import tech.powerjob.common.request.query.WorkflowInstanceInfoQuery;
 import tech.powerjob.common.response.*;
 import tech.powerjob.common.serialize.JsonUtils;
 import tech.powerjob.common.utils.CommonUtils;
@@ -335,6 +337,21 @@ public class PowerJobClient implements IPowerJobClient, Closeable {
         return JSON.parseObject(post, INSTANCE_RESULT_TYPE);
     }
 
+    @Override
+    public ResultDTO<PageResult<InstanceInfoDTO>> queryPageInstanceInfo(InstanceInfoQuery powerQuery) {
+        powerQuery.setAppId(appId);
+        String post = requestService.request(OpenAPIConstant.QUERY_INSTANCE_INFO, PowerRequestBody.newJsonRequestBody(powerQuery));
+        return JSON.parseObject(post, LIST_INSTANCE_RESULT_TYPE);
+    }
+    @Override
+    public ResultDTO<PageResult<String>> queryPageInstanceLog(Long instanceId,Long index) {
+        Map<String, String> param = Maps.newHashMap();
+        param.put("instanceId", instanceId.toString());
+        param.put("appId", appId.toString());
+        param.put("index", index==null?"0":index.toString());
+        String post = requestService.request(OpenAPIConstant.QUERY_INSTANCE_LOG, PowerRequestBody.newFormRequestBody(param));
+        return JSON.parseObject(post, INSTANCE_LOG_RESULT_TYPE);
+    }
     /* ************* Workflow API list ************* */
 
     /**
@@ -551,5 +568,11 @@ public class PowerJobClient implements IPowerJobClient, Closeable {
     @Override
     public void close() throws IOException {
         requestService.close();
+    }
+    @Override
+    public ResultDTO<PageResult<WorkflowInstanceInfoDTO>> queryPageWorkflowInstanceInfo(WorkflowInstanceInfoQuery powerQuery) {
+        powerQuery.setAppId(appId);
+        String post = requestService.request(OpenAPIConstant.QUERY_WORKFLOW_INSTANCE_INFO, PowerRequestBody.newJsonRequestBody(powerQuery));
+        return JSON.parseObject(post, LIST_WF_INSTANCE_RESULT_TYPE);
     }
 }
