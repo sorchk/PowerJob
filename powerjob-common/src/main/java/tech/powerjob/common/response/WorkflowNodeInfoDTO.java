@@ -22,6 +22,11 @@ public class WorkflowNodeInfoDTO {
      */
     private Long jobId;
     /**
+     * 任务名
+     */
+    private String jobName;
+
+    /**
      * 节点别名，默认为对应的任务名称
      */
     private String nodeAlias;

@@ -247,7 +247,7 @@ public class InstanceService {
         return instanceInfoRepository
                 .findAll(QueryConvertUtils.toSpecification(powerQuery))
                 .stream()
-                .map(InstanceService::directConvert)
+                .map(this::directConvert)
                 .collect(Collectors.toList());
     }
 
@@ -260,13 +260,16 @@ public class InstanceService {
         if (!StringUtils.isEmpty(query.getStatus())) {
             queryEntity.setStatus(InstanceStatus.valueOf(query.getStatus()).getV());
         }
+
         Page<InstanceInfoDO> pageResult = instanceInfoRepository.findAll(Example.of(queryEntity), pageable);
+
         return convertPage(pageResult);
     }
 
     private PageResult<InstanceInfoDTO> convertPage(Page<InstanceInfoDO> page) {
         List<InstanceInfoDTO> content = page.getContent().stream()
                 .map(x -> directConvert(x)).collect(Collectors.toList());
+
         PageResult<InstanceInfoDTO> pageResult = new PageResult<>();
         pageResult.setIndex(page.getNumber());
         pageResult.setPageSize(page.getSize());
@@ -359,9 +362,13 @@ public class InstanceService {
         return instanceInfoDO;
     }
 
-    private static InstanceInfoDTO directConvert(InstanceInfoDO instanceInfoDO) {
+    private InstanceInfoDTO directConvert(InstanceInfoDO instanceInfoDO) {
         InstanceInfoDTO instanceInfoDTO = new InstanceInfoDTO();
         BeanUtils.copyProperties(instanceInfoDO, instanceInfoDTO);
+        Optional<JobInfoDO> inst = jobInfoRepository.findById(instanceInfoDO.getJobId());
+        if (inst.isPresent()) {
+            instanceInfoDTO.setJobName(inst.get().getJobName());
+        }
         return instanceInfoDTO;
     }
 }

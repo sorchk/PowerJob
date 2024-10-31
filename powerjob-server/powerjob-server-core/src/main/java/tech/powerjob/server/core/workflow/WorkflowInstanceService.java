@@ -269,9 +269,13 @@ public class WorkflowInstanceService {
 
     }
 
-    private static WorkflowInstanceInfoDTO directConvert(WorkflowInstanceInfoDO instanceInfoDO) {
+    private WorkflowInstanceInfoDTO directConvert(WorkflowInstanceInfoDO instanceInfoDO) {
         WorkflowInstanceInfoDTO workflowInstanceInfoDTO = new WorkflowInstanceInfoDTO();
         BeanUtils.copyProperties(instanceInfoDO, workflowInstanceInfoDTO);
+        Optional<WorkflowInfoDO> inst = workflowInfoRepository.findById(instanceInfoDO.getWorkflowId());
+        if (inst.isPresent()) {
+            workflowInstanceInfoDTO.setWfName(inst.get().getWfName());
+        }
         return workflowInstanceInfoDTO;
     }
 

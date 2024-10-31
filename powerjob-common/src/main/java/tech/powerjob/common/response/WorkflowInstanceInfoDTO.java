@@ -18,6 +18,7 @@ public class WorkflowInstanceInfoDTO {
 
     private Long wfInstanceId;
     private Long workflowId;
+    private String wfName;
 
     /**
      * workflow 状态（WorkflowInstanceStatus）

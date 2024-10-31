@@ -19,6 +19,10 @@ public class InstanceInfoDTO {
      */
     private Long jobId;
     /**
+     * 任务名
+     */
+    private String jobName;
+    /**
      * 任务所属应用的ID，冗余提高查询效率
      */
     private Long appId;
